@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 import sys, termios, tty, time, threading
+from pika.gripper import Gripper
+import numpy as np
 
 # ========== 配置部分 ==========
 JOINT_LIMITS = [
-    (-3.14,  3.14),  # joint1
-    ( 0.00,  1.57),  # joint2
-    (-2.00,  0.00),  # joint3
-    (-1.50,  1.80),  # joint4
-    (-1.30,  1.57),  # joint5
-    (-3.14,  3.14),  # joint6
+    (-3.14,  3.14),
+    ( 0.00,  1.57),
+    (-2.00,  0.00),
+    (-1.50,  1.80),
+    (-1.30,  1.57),
+    (-3.14,  3.14),
 ]
 
 HOME_POS = [0.0, -0.035, 0.0, 0.0, 0.35, 0.0]
 STEP = 0.1
+
+GRIPPER_PORT = "/dev/ttyUSB0"   # 串口路径
+GRIPPER_MIN = 0.0               # 完全闭合（mm）
+GRIPPER_MAX = 90.0              # 完全张开（mm）
+GRIPPER_STEP = 20.0              # 每次按键增减 5mm
 
 
 def clamp(v, lo, hi):
@@ -40,6 +48,60 @@ class TeleopNode(Node):
             'y': (5, +s), 'h': (5, -s),
         }
 
+        # === 初始化夹爪 ===
+        self.gripper = None
+        self.gripper_pos = 0.0
+        self._init_gripper()
+
+    # ==============================
+    # 初始化夹爪
+    # ==============================
+    def _init_gripper(self):
+        try:
+            print(f"[INFO] 尝试连接夹爪 {GRIPPER_PORT} ...")
+            self.gripper = Gripper(GRIPPER_PORT)
+            if not self.gripper.connect():
+                print("[WARN] 无法连接夹爪，请检查连接")
+                self.gripper = None
+                return
+            if not self.gripper.enable():
+                print("[WARN] 启动夹爪失败")
+                self.gripper = None
+                return
+            print("[OK] 夹爪连接成功 ✅")
+            self.gripper_pos = self.gripper.get_gripper_distance()
+        except Exception as e:
+            print(f"[ERROR] 初始化夹爪失败: {e}")
+            self.gripper = None
+
+    # ==============================
+    # 夹爪控制
+    # ==============================
+    def gripper_step_open(self):
+        if self.gripper:
+            self.gripper_pos = clamp(self.gripper_pos + GRIPPER_STEP, GRIPPER_MIN, GRIPPER_MAX)
+            print(f"[CMD] 张开夹爪 -> {self.gripper_pos:.1f} mm")
+            self.gripper.set_gripper_distance(self.gripper_pos)
+
+    def gripper_step_close(self):
+        if self.gripper:
+            self.gripper_pos = clamp(self.gripper_pos - GRIPPER_STEP, GRIPPER_MIN, GRIPPER_MAX)
+            print(f"[CMD] 闭合夹爪 -> {self.gripper_pos:.1f} mm")
+            self.gripper.set_gripper_distance(self.gripper_pos)
+
+    def gripper_disable(self):
+        if self.gripper:
+            try:
+                print("[INFO] 下电夹爪 ...")
+                self.gripper.disable()
+                self.gripper.disconnect()
+                print("[OK] 夹爪已关闭")
+            except Exception as e:
+                print(f"[WARN] 关闭夹爪失败: {e}")
+
+    # ==============================
+    # 机械臂控制
+    # ==============================
     def feedback_cb(self, msg: JointState):
         if len(msg.position) >= 6:
             self.actual_positions = list(msg.position[:6])
@@ -56,7 +118,7 @@ class TeleopNode(Node):
         print(f"[FBK]{fbk} | {prefix}[CMD]{cmd}", flush=True)
 
     def go_home(self, sec: float = 3.0, steps: int = 30):
-        print("[INFO] 回到 HOME ...", flush=True)
+        print("[INFO] 回 HOME ...")
         start = self.joint_positions[:]
         target = [clamp(v, *JOINT_LIMITS[i]) for i, v in enumerate(HOME_POS)]
         for i in range(1, steps + 1):
@@ -66,8 +128,11 @@ class TeleopNode(Node):
             time.sleep(sec / steps)
         self.joint_positions = target
         self.publish_joint_state()
-        self.print_both(prefix="[HOME] ")
+        self.print_both("[HOME] ")
 
+    # ==============================
+    # 主循环
+    # ==============================
     def run(self):
         spin_thread = threading.Thread(target=rclpy.spin, args=(self,), daemon=True)
         spin_thread.start()
@@ -75,16 +140,25 @@ class TeleopNode(Node):
         settings = termios.tcgetattr(sys.stdin)
         tty.setcbreak(sys.stdin.fileno())
 
-        print("键盘控制：q/a w/s e/d r/f t/g y/h 调关节 | Z=回HOME | 空格=退出", flush=True)
+        print("键盘控制：")
+        print("q/a w/s e/d r/f t/g y/h 控制关节")
+        print("u 张开夹爪 | j 闭合夹爪")
+        print("z 回HOME | 空格退出")
+        print("====================================", flush=True)
+
         try:
             while True:
                 key = sys.stdin.read(1)
                 if key == ' ':
+                    print("[INFO] 空格退出程序")
                     break
                 if key in ('z', 'Z'):
                     self.go_home()
-                    continue
-                if key in self.key_map:
+                elif key in ('u', 'U'):
+                    self.gripper_step_open()
+                elif key in ('j', 'J'):
+                    self.gripper_step_close()
+                elif key in self.key_map:
                     idx, delta = self.key_map[key]
                     lo, hi = JOINT_LIMITS[idx]
                     self.joint_positions[idx] = clamp(self.joint_positions[idx] + delta, lo, hi)
@@ -93,6 +167,7 @@ class TeleopNode(Node):
         finally:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
             self.go_home()
+            self.gripper_disable()
 
 
 def main():
