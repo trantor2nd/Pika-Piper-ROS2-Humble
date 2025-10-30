@@ -1,4 +1,5 @@
 #!/bin/bash
+
 #set -e  # 一旦出错立即退出
 trap cleanup INT TERM  # 捕获 Ctrl+C / kill 信号
 # ========= 配置部分 =========
