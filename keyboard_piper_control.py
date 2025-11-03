@@ -56,9 +56,9 @@ class TeleopNode(Node):
         self.key_map = {
             'a': (0, +s), 'd': (0, -s),
             'w': (1, +s), 's': (1, -s),
-            'f': (2, +s), 'r': (2, -s),
-            't': (3, +s), 'g': (3, -s),
-            'y': (4, +s), 'h': (4, -s),
+            'j': (2, +s), 'u': (2, -s),
+            'r': (3, +s), 'f': (3, -s),
+            't': (4, +s), 'g': (4, -s),
             'e': (5, +s), 'q': (5, -s),
         }
 
@@ -176,8 +176,8 @@ class TeleopNode(Node):
         sys.stdin.flush()
 
         print("键盘控制：")
-        print("a/d w/s r/f t/g q/e y/h q/e 控制关节") 
-        print("u 张开夹爪 | j 闭合夹爪")
+        print("a/d w/s u/j r/f t/g q/e 控制关节") 
+        print("h 张开夹爪 | k 闭合夹爪")
         print("o 开始录制 | p 停止录制")
         print("z 回HOME | 空格退出")
         print("====================================", flush=True)
@@ -196,9 +196,9 @@ class TeleopNode(Node):
                     self._running = False
                 elif key in ('z', 'Z'):
                     self.go_home()
-                elif key in ('j', 'J'):
+                elif key in ('h', 'H'):
                     self.gripper_step_open()
-                elif key in ('u', 'U'):
+                elif key in ('k', 'K'):
                     self.gripper_step_close()
                 elif key in ('o', 'O'):
                     self.toggle_recording(True)
