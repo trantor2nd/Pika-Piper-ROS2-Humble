@@ -31,7 +31,7 @@ STEP = 0.05
 GRIPPER_PORT = "/dev/ttyUSB1"   # 串口路径
 GRIPPER_MIN = 0.0               # 完全闭合（mm）
 GRIPPER_MAX = 90.0              # 完全张开（mm）
-GRIPPER_STEP = 20             # 每次按键增减 20mm
+GRIPPER_STEP = 10             # 每次按键增减 20mm
 
 
 def clamp(v, lo, hi):
@@ -51,6 +51,8 @@ class TeleopNode(Node):
         self.actual_positions = [0.0] * 6
         self.recording = False
         self._running = True
+        self._gripper_timer = None
+        self._zero_glitch_count = 0
 
         s = STEP
         self.key_map = {
@@ -86,6 +88,7 @@ class TeleopNode(Node):
             self.gripper_pos = self.gripper.get_gripper_distance()
             self._publish_gripper_state()
             self.pub_enable.publish(Bool(data=True))
+            self._gripper_timer = self.create_timer(0.1, self._poll_gripper_state)
         except Exception as e:
             print(f"[ERROR] 初始化夹爪失败: {e}")
             self.gripper = None
@@ -95,6 +98,27 @@ class TeleopNode(Node):
     # ==============================
     def _publish_gripper_state(self):
         self.pub_gripper_state.publish(Float64(data=float(self.gripper_pos)))
+
+    def _poll_gripper_state(self):
+        if not self.gripper:
+            return
+        try:
+            current = self.gripper.get_gripper_distance()
+        except Exception:
+            logging.getLogger("teleop.gripper").exception("读取夹爪距离失败")
+            return
+
+        clamped = clamp(current, GRIPPER_MIN, GRIPPER_MAX)
+        if clamped < GRIPPER_MIN + 1.0 and self.gripper_pos > GRIPPER_MIN + 5.0:
+            self._zero_glitch_count += 1
+            if self._zero_glitch_count < 3:
+                return
+        else:
+            self._zero_glitch_count = 0
+
+        if abs(clamped - self.gripper_pos) > 1e-3:
+            self.gripper_pos = clamped
+            self._publish_gripper_state()
 
     def gripper_step_open(self):
         if self.gripper:
@@ -220,6 +244,8 @@ class TeleopNode(Node):
                 except Exception:
                     pass
                 self._publish_gripper_state()
+            if self._gripper_timer:
+                self._gripper_timer.cancel()
             self.pub_enable.publish(Bool(data=False))
             self.gripper_disable()
             executor.remove_node(self)

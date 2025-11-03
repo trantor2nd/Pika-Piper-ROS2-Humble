@@ -40,14 +40,14 @@ class DataRecorder(Node):
 
         # ---- ROS 通信 ----
         self.create_subscription(JointState, "/joint_states_single", self.joint_cb, 10)
-        self.create_subscription(Float64, "/gripper_state", self.gripper_cb, 10)
+        self.create_subscription(Float64, "/gripper_state", self.gripper_state_cb, 10)
         self.create_subscription(String, "/record_cmd", self.cmd_cb, 10)
 
         # ---- 状态变量 ----
         self.recording = False
         self.running = True
         self.joint_state = [0.0] * 6
-        self.gripper_pos = 0.0
+        self.gripper_actual = 0.0
         self.episode_dir = None
         self.frame_id = 0
 
@@ -67,8 +67,8 @@ class DataRecorder(Node):
         if len(msg.position) >= 6:
             self.joint_state = list(msg.position[:6])
 
-    def gripper_cb(self, msg: Float64) -> None:
-        self.gripper_pos = msg.data
+    def gripper_state_cb(self, msg: Float64) -> None:
+        self.gripper_actual = msg.data
 
     def cmd_cb(self, msg: String) -> None:
         if msg.data == "start":
@@ -176,7 +176,7 @@ class DataRecorder(Node):
 
                 # ---- 状态存储 ----
                 state_path = os.path.join(episode_dir, f"state/{fid}.log")
-                state_data = self.joint_state + [self.gripper_pos]
+                state_data = self.joint_state + [self.gripper_actual]
                 with open(state_path, "w") as f:
                     f.write(" ".join(f"{value:.6f}" for value in state_data) + "\n")
 
