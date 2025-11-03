@@ -80,6 +80,7 @@ class TrajectoryPlayer(Node):
 
         self.actual_positions = [0.0] * 6
         self.command_index = 0
+        self._shutdown_called = False
 
         self.gripper = None
         self.gripper_port = gripper_port
@@ -135,12 +136,9 @@ class TrajectoryPlayer(Node):
                 self.command_index = 0
                 self.get_logger().info("轨迹循环重新开始")
             else:
-                self.get_logger().info("轨迹复现完成")
-                if self.timer:
-                    self.timer.cancel()
-                    self.timer = None
-                # After final frame, trigger shutdown
-                self._on_playback_complete()
+                self.get_logger().info("轨迹复现完成，准备退出")
+                self.shutdown()
+                rclpy.shutdown()
                 return
 
         target = self.states[self.command_index]
@@ -184,12 +182,11 @@ class TrajectoryPlayer(Node):
         for i in range(count):
             self.actual_positions[i] = msg.position[i]
 
-    def _on_playback_complete(self) -> None:
-        self.get_logger().info("等待退出信号 ...")
-        # stop spinning after a short delay to flush last messages
-        rclpy.shutdown()
-
     def shutdown(self) -> None:
+        if self._shutdown_called:
+            return
+        self._shutdown_called = True
+
         if self.timer:
             self.timer.cancel()
             self.timer = None
@@ -220,24 +217,22 @@ class TrajectoryPlayer(Node):
         self.pub_enable.publish(Bool(data=value))
         if not self.enable_client:
             return
-        if not self.enable_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().warning("enable_srv 不可达，跳过服务调用")
+        if not self.enable_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().debug("enable_srv 不可达，略过服务调用")
             return
         request = Enable.Request()
         request.enable_request = value
         future = self.enable_client.call_async(request)
-        rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
-        if future.cancelled():
-            self.get_logger().warning("enable_srv 调用被取消")
-        elif future.exception() is not None:
-            self.get_logger().warning(f"enable_srv 调用失败: {future.exception()}")
+        # 不阻塞等待结果，避免退出卡住
+        future.add_done_callback(self._enable_response_cb)
+
+    def _enable_response_cb(self, future) -> None:
+        try:
+            response = future.result()
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().debug(f"enable_srv 回调异常: {exc}")
         else:
-            try:
-                response = future.result()
-            except Exception as exc:  # noqa: BLE001
-                self.get_logger().warning(f"enable_srv 结果异常: {exc}")
-            else:
-                self.get_logger().info(f"enable_srv 响应: {response}")
+            self.get_logger().debug(f"enable_srv 响应: {response}")
 
 
 # ------------------------------- Utilities -------------------------------
@@ -332,7 +327,6 @@ def main() -> None:
             node.shutdown()
         finally:
             node.destroy_node()
-            rclpy.shutdown()
 
 
 if __name__ == "__main__":
