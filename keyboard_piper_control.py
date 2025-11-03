@@ -18,7 +18,7 @@ from pika.gripper import Gripper
 # ========== 配置部分 ==========
 JOINT_LIMITS = [
     (-3.14,  3.14),
-    ( 0.00,  1.57),
+    ( 0.00,  2.00),
     (-2.00,  0.00),
     (-1.50,  1.80),
     (-1.30,  1.57),
@@ -26,12 +26,12 @@ JOINT_LIMITS = [
 ]
 
 HOME_POS = [0.0, -0.035, 0.0, 0.0, 0.35, 0.0]
-STEP = 0.1
+STEP = 0.05
 
 GRIPPER_PORT = "/dev/ttyUSB1"   # 串口路径
 GRIPPER_MIN = 0.0               # 完全闭合（mm）
 GRIPPER_MAX = 90.0              # 完全张开（mm）
-GRIPPER_STEP = 20.0             # 每次按键增减 20mm
+GRIPPER_STEP = 20             # 每次按键增减 20mm
 
 
 def clamp(v, lo, hi):
@@ -54,12 +54,12 @@ class TeleopNode(Node):
 
         s = STEP
         self.key_map = {
-            'q': (0, +s), 'a': (0, -s),
+            'a': (0, +s), 'd': (0, -s),
             'w': (1, +s), 's': (1, -s),
-            'e': (2, +s), 'd': (2, -s),
-            'r': (3, +s), 'f': (3, -s),
-            't': (4, +s), 'g': (4, -s),
-            'y': (5, +s), 'h': (5, -s),
+            'f': (2, +s), 'r': (2, -s),
+            't': (3, +s), 'g': (3, -s),
+            'y': (4, +s), 'h': (4, -s),
+            'e': (5, +s), 'q': (5, -s),
         }
 
         # === 初始化夹爪 ===
@@ -176,7 +176,7 @@ class TeleopNode(Node):
         sys.stdin.flush()
 
         print("键盘控制：")
-        print("q/a w/s e/d r/f t/g y/h 控制关节")
+        print("a/d w/s r/f t/g q/e y/h q/e 控制关节") 
         print("u 张开夹爪 | j 闭合夹爪")
         print("o 开始录制 | p 停止录制")
         print("z 回HOME | 空格退出")
@@ -196,9 +196,9 @@ class TeleopNode(Node):
                     self._running = False
                 elif key in ('z', 'Z'):
                     self.go_home()
-                elif key in ('u', 'U'):
-                    self.gripper_step_open()
                 elif key in ('j', 'J'):
+                    self.gripper_step_open()
+                elif key in ('u', 'U'):
                     self.gripper_step_close()
                 elif key in ('o', 'O'):
                     self.toggle_recording(True)
