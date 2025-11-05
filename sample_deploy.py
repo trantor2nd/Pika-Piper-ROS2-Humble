@@ -42,7 +42,7 @@ GRIPPER_MIN = 0.0      # mm
 GRIPPER_MAX = 90.0     # mm
 DEFAULT_RATE = 5.0     # Hz
 DEFAULT_WARMUP = 4.0   # s (move to first waypoint)
-GRIPPER_PORT = "/dev/ttyUSB1"
+GRIPPER_PORT = "/dev/ttyUSB0"
 
 
 def clamp(value: float, bounds: Sequence[float]) -> float:

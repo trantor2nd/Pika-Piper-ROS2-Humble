@@ -28,7 +28,7 @@ JOINT_LIMITS = [
 HOME_POS = [0.0, -0.035, 0.0, 0.0, 0.35, 0.0]
 STEP = 0.05
 
-GRIPPER_PORT = "/dev/ttyUSB1"   # 串口路径
+GRIPPER_PORT = "/dev/ttyUSB0"   # 串口路径
 GRIPPER_MIN = 0.0               # 完全闭合（mm）
 GRIPPER_MAX = 90.0              # 完全张开（mm）
 GRIPPER_STEP = 10             # 每次按键增减 20mm

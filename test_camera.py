@@ -14,7 +14,7 @@ def main():
     # 创建 Gripper 对象并连接
     print("正在连接 Pika Gripper 设备...")
     # 使用 Gripper 类进行实例化
-    my_gripper = Gripper("/dev/ttyUSB1")  # 请根据实际情况修改串口路径,默认参数为：/dev/ttyUSB0
+    my_gripper = Gripper("/dev/ttyUSB0")  # 请根据实际情况修改串口路径,默认参数为：/dev/ttyUSB0
     
     if not my_gripper.connect():
         print("连接 Pika Gripper 设备失败，请检查设备连接和串口路径")
