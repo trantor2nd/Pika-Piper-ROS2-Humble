@@ -26,7 +26,7 @@ JOINT_LIMITS = [
 ]
 
 HOME_POS = [0.0, -0.035, 0.0, 0.0, 0.35, 0.0]
-STEP = 0.05
+STEP = 0.025
 
 GRIPPER_PORT = "/dev/ttyUSB0"   # 串口路径
 GRIPPER_MIN = 0.0               # 完全闭合（mm）
