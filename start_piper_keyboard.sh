@@ -18,6 +18,11 @@ CONTROL_SCRIPT="$TELEOP_WS/keyboard_piper_control.py"
 RECORD_SCRIPT="$TELEOP_WS/data_recorder.py"
 sudo chmod 666 $USB_PORT
 
+# >>> Use Conda Python for ROS2 >>>
+export PYTHON_EXECUTABLE=/home/hsb/miniforge3/envs/py310/bin/python
+export PYTHONPATH=/home/hsb/miniforge3/envs/py310/lib/python3.10/site-packages:$PYTHONPATH
+# <<< Use Conda Python for ROS2 <<<
+
 # ========= 清理函数 =========
 cleanup() {
     echo ""

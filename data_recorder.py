@@ -17,7 +17,7 @@ from pika.camera.realsense import RealSenseCamera
 # ==============================
 # 配置部分
 # ==============================
-SAVE_ROOT = "/home/data/Dataset/oracle_dataset_raw/pick_up_the_wooden_block_and_place_it_on_the_pad"  # 数据保存根目录
+SAVE_ROOT = "/home/data/Dataset/piper_dataset_raw/pick_up_the_wooden_block_and_place_it_on_the_pad"  # 数据保存根目录
 CAPTURE_HZ = 10.0  # 采样频率 10Hz
 
 # Camera configuration

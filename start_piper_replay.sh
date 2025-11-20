@@ -21,6 +21,12 @@ RATE="${RATE:-10}"
 WARMUP="${WARMUP:-3}"
 LOOP_FLAG=""
 
+# >>> Use Conda Python for ROS2 >>>
+export PYTHON_EXECUTABLE=/home/hsb/miniforge3/envs/py310/bin/python
+export PYTHONPATH=/home/hsb/miniforge3/envs/py310/lib/python3.10/site-packages:$PYTHONPATH
+# <<< Use Conda Python for ROS2 <<<
+
+
 if [ "${LOOP:-0}" -eq 1 ] || [ "${2:-}" = "--loop" ]; then
     LOOP_FLAG="--loop"
 fi
