@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 """
-Convert the Oracle raw dataset located under /home/data/Dataset/oracle_dataset_raw
+Convert the raw dataset located under /home/data/Dataset/piper_dataset_raw
 into a single LeRobot v3 dataset stored under /home/data/Dataset/rheovla_dataset_lerobot.
 Each episode is stored in its own parquet and per-camera MP4 files (one episode per file).
 
 The raw dataset is expected to be organized as:
 
-oracle_dataset_raw/
+piper_dataset_raw/
   <task_name>/
     episode_00000/
       img/
@@ -37,16 +37,15 @@ from PIL import Image
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-RAW_ROOT = Path("/home/data/Dataset/oracle_dataset_raw")
+RAW_ROOT = Path("/home/data/Dataset/piper_dataset_raw")
 OUTPUT_DATASET_PATH = Path("/home/data/Dataset/rheovla_dataset_lerobot")
 DEFAULT_REPO_ID = "rheovla_dataset_lerobot"
 DEFAULT_FPS = 10
-DEFAULT_ACTION_CHUNK = 10
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Convert Oracle dataset to LeRobot v3 format.")
-    parser.add_argument("--raw-root", type=Path, default=RAW_ROOT, help="Path to oracle_dataset_raw.")
+    parser = argparse.ArgumentParser(description="Convert raw dataset to LeRobot v3 format.")
+    parser.add_argument("--raw-root", type=Path, default=RAW_ROOT, help="Path to piper_dataset_raw.")
     parser.add_argument("--output-path", type=Path, default=OUTPUT_DATASET_PATH, help="Where to store LeRobot dataset.")
     parser.add_argument("--repo-id", type=str, default=DEFAULT_REPO_ID, help="Repo id recorded in metadata.")
     parser.add_argument("--fps", type=int, default=DEFAULT_FPS, help="Recording FPS used in metadata.")
@@ -58,9 +57,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--action-chunk-size",
         type=int,
-        default=DEFAULT_ACTION_CHUNK,
-        help="Number of future states to pack into each action vector (>=1).",
+        default=1,
+        help="Legacy option (ignored); actions are stored per frame.",
     )
+
+    # Kept for backward compatibility but ignored (actions are per-frame vectors).
+
     parser.add_argument(
         "--log-level",
         type=str,
@@ -90,14 +92,9 @@ def load_state_sequence(state_dir: Path) -> np.ndarray:
     return np.stack(frames, axis=0)
 
 
-def compute_action_chunks(states: np.ndarray, chunk_size: int) -> np.ndarray:
-    if chunk_size <= 0:
-        raise ValueError("action chunk size must be >= 1")
-
-    num_frames, state_dim = states.shape
-    offsets = np.arange(1, chunk_size + 1, dtype=np.int32)
-    indices = np.clip(np.arange(num_frames)[:, None] + offsets, 0, num_frames - 1)
-    return states[indices]
+def compute_actions(states: np.ndarray) -> np.ndarray:
+    """Return per-frame actions (no chunking)."""
+    return states
 
 
 def discover_cameras(episode_dir: Path) -> dict[str, tuple[int, int, int]]:
@@ -139,8 +136,6 @@ def build_features(
     action_chunk_size: int,
 ) -> dict:
     state_names = [f"dim_{idx}" for idx in range(state_dim)]
-    if action_chunk_size <= 0:
-        raise ValueError("action_chunk_size must be >= 1")
 
     features: dict[str, dict] = {
         "observation.state": {
@@ -150,8 +145,8 @@ def build_features(
         },
         "action": {
             "dtype": "float32",
-            "shape": (action_chunk_size, state_dim),
-            "names": ["chunk", "dim"],
+            "shape": (state_dim,),
+            "names": state_names,
         },
     }
     dtype = "video" if use_videos else "image"
@@ -239,7 +234,7 @@ def convert(args: argparse.Namespace) -> None:
         task_text = make_task_text(task_dir)
         for episode_dir in episodes:
             states = load_state_sequence(episode_dir / "state")
-            actions = compute_action_chunks(states, args.action_chunk_size)
+            actions = compute_actions(states)
             image_paths = gather_episode_paths(episode_dir, camera_names)
             num_frames = states.shape[0]
             for cam in camera_names:
