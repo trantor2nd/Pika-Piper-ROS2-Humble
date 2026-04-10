@@ -1,0 +1,1 @@
+cd /home/data/Project/pika_ros/install/libsurvive/bin && ./survive-cli --force-calibrate
